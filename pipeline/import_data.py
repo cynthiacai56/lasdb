@@ -11,7 +11,7 @@ from db import PgDatabase
 
 def dir_importer(args):
     path, ratio = args.path, args.ratio
-    name, crs = args.name, args.crs
+    name, crs = args.title, args.crs
     dbname, user, password = args.db, args.user, args.key
     host, port = 'localhost', 5432
 
@@ -34,7 +34,7 @@ def dir_importer(args):
 def file_importer(args):
     # Load parameters
     path, ratio = args.path, args.ratio
-    name, crs = args.name, args.crs
+    name, crs = args.title, args.crs
     dbname, user, password = args.db, args.user, args.key
     host, port = 'localhost', 5432
 
