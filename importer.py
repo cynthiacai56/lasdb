@@ -13,10 +13,10 @@ def main():
     parser_file.add_argument("-r", "--ratio", type=float, default=0.7, help="the ratio to split the sfc key")
     parser_file.add_argument("-n", "--name", type=str, default="delft", help="the name of the point cloud")
     parser_file.add_argument("-c", "--crs", type=str, default="EPSG:28992", help="the Spatial Reference System of the point cloud")
+    parser_file.add_argument("-d", "--db", type=str, default="cynthia", help='database name')
     parser_file.add_argument("-U", "--user", type=str, default="cynthia", help='database username')
     parser_file.add_argument("-k", "--key", type=str, default="123456", help='database password')
-    parser_file.add_argument("-h", "--host", type=str, default="localhost", help='database host')
-    parser_file.add_argument("-d", "--db", type=str, default="cynthia", help='database name')
+    #parser_file.add_argument("-h", "--host", type=str, default="localhost", help='database host')
     parser_file.set_defaults(func=file_importer)
 
     # Mode 2:a directory
@@ -25,10 +25,10 @@ def main():
     parser_dir.add_argument("-r", "--ratio", type=float, default=0.7, help="the ratio to split the sfc key")
     parser_dir.add_argument("-n", "--name", type=str, default="delft", help="the name of the point cloud")
     parser_dir.add_argument("-c", "--crs", type=str, default="EPSG:28992", help="the Spatial Reference System of the point cloud")
+    parser_dir.add_argument("-d", "--db", type=str, default="cynthia", help='database name')
     parser_dir.add_argument("-U", "--user", type=str, default="cynthia", help='database username')
     parser_dir.add_argument("-k", "--key", type=str, default="123456", help='database password')
-    parser_dir.add_argument("-h", "--host", type=str, default="localhost", help='database host')
-    parser_dir.add_argument("-d", "--db", type=str, default="cynthia", help='database name')
+    #parser_dir.add_argument("-h", "--host", type=str, default="localhost", help='database host')
     parser_dir.set_defaults(func=dir_importer)
 
     args = parser.parse_args()
