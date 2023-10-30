@@ -125,7 +125,7 @@ class PointGroupProcessor:
 
         pc_groups = make_groups(encoded_pts)
         self.write_csv(pc_groups)
-        print("The group count:", len(pc_groups))
+        #print("The group count:", len(pc_groups))
 
     def process_points_chunk(self, path, tail_len):
         encoded_pts = []
