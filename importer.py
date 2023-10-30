@@ -21,7 +21,7 @@ def main():
 
     # Mode 2:a directory
     parser_dir = subparsers.add_parser("dir", help="directory mode help")
-    parser_dir.add_argument("-p", "--path", type=str, default="/work/tmp/cynthia/bench_000210m/ahn_bench00210.las", help="the path to the input file")
+    parser_dir.add_argument("-p", "--path", type=str, default="/work/tmp/cynthia/bench_002201m", help="the path to the input file")
     parser_dir.add_argument("-r", "--ratio", type=float, default=0.7, help="the ratio to split the sfc key")
     parser_dir.add_argument("-n", "--name", type=str, default="delft", help="the name of the point cloud")
     parser_dir.add_argument("-c", "--crs", type=str, default="EPSG:28992", help="the Spatial Reference System of the point cloud")
@@ -42,8 +42,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #main()
-    start_time = time.time()
     main()
-    run_time = time.time() - start_time
-    print("The total running time:", run_time)

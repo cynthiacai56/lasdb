@@ -94,7 +94,7 @@ class DirMetaProcessor:
         db = PgDatabase(dbname, user, password, host, port)
         db.connect()
         db.create_table()
-        insert_meta_sql = "INSERT INTO pc_metadata_20m VALUES (%s, %s, %s, %s, %s, %s);"
+        insert_meta_sql = "INSERT INTO pc_metadata_210m VALUES (%s, %s, %s, %s, %s, %s);"
         db.execute_query(insert_meta_sql, self.meta)
         db.disconnect()
 
