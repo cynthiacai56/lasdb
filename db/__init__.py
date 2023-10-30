@@ -41,7 +41,7 @@ class PgDatabase:
             CREATE TABLE IF NOT EXISTS pc_metadata_2201m (
                 name TEXT,
                 crs TEXT,
-                point_count INT,
+                point_count BIGINT,
                 head_length INT,
                 tail_length INT,
                 bbox DOUBLE PRECISION[]
