@@ -104,7 +104,7 @@ class PgDatabase:
             try:
                 self.cursor.copy_expert(sql="COPY pc_record_2201m FROM stdin WITH CSV HEADER", file=f)
                 self.connection.commit()
-                print("Data copied successfully.")
+                #print("Data copied successfully.")
             except Error as e:
                 print("Error: Unable to copy the data.")
                 print(e)
