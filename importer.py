@@ -45,6 +45,6 @@ def main():
 if __name__ == "__main__":
     #main()
     start_time = time.time()
-    test_dir()
+    main()
     run_time = time.time() - start_time
     print("The total running time:", run_time)
