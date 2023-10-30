@@ -67,7 +67,7 @@ class DirMetaProcessor:
     def get_meta_dir(self):
         # 1. Get a list of files
         files = self.get_file_names()
-        self.new_path = [self.path + "\\" + file for file in files]
+        self.new_path = [self.path + "/" + file for file in files]
 
         # 2. Iterate each file, read the header and extract point cloud and bbox
         with laspy.open(self.new_path[0]) as f:
