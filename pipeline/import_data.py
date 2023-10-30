@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import laspy
-#from tqdm import tqdm
+from tqdm import tqdm
 
 from pcsfc.encoder import compute_split_length, process_point, make_groups
 from db import PgDatabase
@@ -24,7 +24,7 @@ def dir_importer(args):
     print(meta.meta)
 
     # Process and load the points
-    for input_path in new_path:
+    for input_path in tqdm(new_path):
         importer = PointGroupProcessor(input_path, tail_len)
         importer.import_db(dbname, user, password)
 
@@ -94,7 +94,7 @@ class DirMetaProcessor:
         db = PgDatabase(dbname, user, password, host, port)
         db.connect()
         db.create_table()
-        insert_meta_sql = "INSERT INTO pc_metadata_210m VALUES (%s, %s, %s, %s, %s, %s);"
+        insert_meta_sql = "INSERT INTO pc_metadata_2201m VALUES (%s, %s, %s, %s, %s, %s);"
         db.execute_query(insert_meta_sql, self.meta)
         db.disconnect()
 
