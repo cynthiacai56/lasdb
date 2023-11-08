@@ -3,7 +3,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import laspy
-from tqdm import tqdm
+
+from psycopg2 import connect, Error
 
 from pcsfc.encoder import compute_split_length, process_point, make_groups
 from db import PgDatabase
@@ -11,22 +12,27 @@ from db import PgDatabase
 
 def dir_importer(args):
     path, ratio = args.path, args.ratio
-    name, crs = args.name, args.crs
-    dbname, user, password = args.db, args.user, args.key
-    host, port = 'localhost', 5432
+    name, srid = args.name, args.srid
+    db_conf = {
+        "dbname": args.db,
+        "user": args.user,
+        "password": args.key,
+        "host": "localhost",
+        "port": 5432
+    }
 
     # Process and load the metadata
-    meta = DirMetaProcessor(path, ratio, name, crs)
+    meta = MetaProcessor(path, ratio, name, srid)
     meta.get_meta_dir()
-    meta.store_in_db(dbname, user, password)
+    meta.store_in_db(db_conf)
     new_path = meta.new_path
     tail_len = meta.meta[4]
     print(meta.meta)
 
     # Process and load the points
-    for input_path in tqdm(new_path):
+    for input_path in new_path:
         importer = PointGroupProcessor(input_path, tail_len)
-        importer.import_db(dbname, user, password)
+        importer.import_db(db_conf)
 
     # TODO: Merge duplicate sfc_head
 
@@ -34,27 +40,40 @@ def dir_importer(args):
 def file_importer(args):
     # Load parameters
     path, ratio = args.path, args.ratio
-    name, crs = args.name, args.crs
-    dbname, user, password = args.db, args.user, args.key
-    host, port = 'localhost', 5432
+    name, srid = args.name, args.srid
+    db_conf = {
+        "dbname": args.db,
+        "user": args.user,
+        "password": args.key,
+        "host": "localhost",
+        "port": 5432
+    }
 
     # Load metadata
-    meta = DirMetaProcessor(path, ratio, name, crs)
+    meta = MetaProcessor(path, ratio, name, srid)
     meta.get_meta_file()
-    meta.store_in_db(dbname, user, password)
+    meta.store_in_db(db_conf)
     tail_len = meta.meta[4]
     print(meta.meta)
 
     # Read, encode and group the points
     importer = PointGroupProcessor(path, tail_len)
-    importer.import_db(dbname, user, password)
+    importer.import_db(db_conf)
 
-class DirMetaProcessor:
-    def __init__(self, path, ratio, name, crs):
+class MetaProcessor:
+    def __init__(self, path, ratio, name, srid):
         self.path = path
         self.ratio = ratio
         self.name = name
-        self.crs = crs
+        self.srid = srid
+        self.meta = None
+        self.new_path = None
+
+    def get_meta(self, mode):
+        if mode == "file":
+            self.meta = self.get_meta_file()
+        elif mode == "dir":
+            self.meta = self.get_meta_dir()
 
     def get_meta_file(self):
         with laspy.open(self.path) as f:
@@ -62,7 +81,8 @@ class DirMetaProcessor:
             head_len, tail_len = compute_split_length(int(f.header.x_max), int(f.header.y_max), self.ratio)
             bbox = [f.header.x_min, f.header.x_max, f.header.y_min, f.header.y_max, f.header.z_min, f.header.z_max]
 
-        self.meta = [self.name, self.crs, point_count, head_len, tail_len, bbox]
+        meta = [self.name, self.srid, point_count, head_len, tail_len, bbox]
+        return meta
 
     def get_meta_dir(self):
         # 1. Get a list of files
@@ -88,14 +108,14 @@ class DirMetaProcessor:
 
         # 3. Based on the bbox of the whole point cloud, determine head_length and tail_length
         head_len, tail_len = compute_split_length(int(x_min), int(y_max), self.ratio)
-        self.meta = [self.name, self.crs, point_count, head_len, tail_len, bbox]
+        meta = [self.name, self.srid, point_count, head_len, tail_len, bbox]
+        return meta
 
-    def store_in_db(self, dbname, user, password, host="localhost", port=5432):
-        db = PgDatabase(dbname, user, password, host, port)
+    def store_in_db(self, db_conf):
+        db = PgDatabase(db_conf["dbname"], db_conf["user"], db_conf["password"], db_conf["host"], db_conf["port"])
         db.connect()
-        db.create_table()
-        insert_meta_sql = "INSERT INTO pc_metadata_2201m VALUES (%s, %s, %s, %s, %s, %s);"
-        db.execute_query(insert_meta_sql, self.meta)
+        db.create_table(self.name)
+        db.execute_sql(f"INSERT INTO pc_metadata_{self.name} VALUES (%s, %s, %s, %s, %s, %s);", self.meta)
         db.disconnect()
 
     def get_file_names(self):
@@ -124,7 +144,6 @@ class PointGroupProcessor:
         encoded_pts = [process_point(pt, tail_len) for pt in points]
 
         pc_groups = make_groups(encoded_pts)
-        # print("The group count:", len(pc_groups))
         self.write_csv(pc_groups)
 
     def process_points_chunk(self, path, tail_len):
@@ -135,7 +154,6 @@ class PointGroupProcessor:
                 encoded_pts = encoded_pts + [process_point(pt, tail_len) for pt in pts]
 
         pc_groups = make_groups(encoded_pts)
-        # print("The number of groups:", len(pc_groups))
         self.write_csv(pc_groups)
 
     def write_csv(self, pc_groups):
@@ -144,8 +162,9 @@ class PointGroupProcessor:
         df['z'] = df['z'].apply(lambda x: str(x).replace('[', '{').replace(']', '}'))
         df.to_csv("pc_record.csv", index=False, mode='w')
 
-    def import_db(self, dbname, user, password, host="localhost", port=5432):
-        db = PgDatabase(dbname, user, password, host, port)
+    def import_db(self, db_conf, name):
+        db = PgDatabase(db_conf["dbname"], db_conf["user"], db_conf["password"], db_conf["host"], db_conf["port"])
         db.connect()
-        db.execute_copy("pc_record.csv")
+        table_name = "pc_record_" + name
+        db.execute_copy("pc_record.csv", name)
         db.disconnect()

@@ -11,7 +11,7 @@ def morton_range(bbox, start, body_len, end_len):
     ranges = []
 
     # Iterate through all possible Morton code slices, moving two bits at a time
-    for i in range(2, body_len, 2):  # i is the length of the head_sfc
+    for i in range(2, body_len, 2):
         full_one_end = (1 << (nbits - i)) - 1  # nbits个1
         overlaps = []
         for slice_min in fronts:
@@ -22,15 +22,20 @@ def morton_range(bbox, start, body_len, end_len):
 
             # Fully containment
             if xs_min >= x_min and xs_max <= x_max and ys_min >= y_min and ys_max <= y_max:
-                ranges.append((slice_min >> end_len, slice_max >> end_len))
-                # print(slice_min, slice_max, 'fully contained')
+                #ranges.append(((slice_min >> end_len) - start, (slice_max >> end_len) - start))
+                #ranges.append(((slice_min >> end_len) - (start << body_len), (slice_max >> end_len) - (start << body_len)))
+                slice_min_lol = (slice_min >> end_len) - (start << body_len)
+                slice_max_lol = (slice_max >> end_len) - (start << body_len)
+                ranges.append([slice_min_lol, slice_max_lol])
+                #ranges.append((slice_min >> end_len, slice_max >> end_len))
+                #print(slice_min, slice_max, 'fully contained')
             # No containment
             elif xs_max < x_min or xs_min > x_max or ys_max < y_min or ys_min > y_max:
-                # print(slice_min, slice_max, 'no containment')
+                #print(slice_min, slice_max, 'no containment')
                 pass
             # Overlap
             else:
-                # print(slice_min, slice_max, 'overlaps')
+                #print(slice_min, slice_max, 'overlaps')
                 new_units = [unit << (nbits - i - 2) for unit in base_units]
                 for new_unit in new_units:
                     new_slice_min = slice_min | new_unit
@@ -40,5 +45,8 @@ def morton_range(bbox, start, body_len, end_len):
         if len(fronts) == 0:
             break
 
-    overlaps_shift = [key >> end_len for key in overlaps]
+    #overlaps_shift = [(key >> end_len) - (start - body_len) for key in overlaps]
+    #overlaps_shift = [key >> end_len for key in overlaps]
+    overlaps_shift = [(key >> end_len) - (start << body_len)for key in overlaps]
+    #overlaps_shift =
     return ranges, overlaps_shift

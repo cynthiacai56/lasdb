@@ -1,45 +1,60 @@
-import argparse
+import sys
+import json
 import time
-from pipeline.import_data import file_importer, dir_importer
+import argparse
+from pipeline.import_data import MetaProcessor, PointGroupProcessor
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Your script description")
-    subparsers = parser.add_subparsers(title="Available modes", dest="mode")
-
-    # Mode 1: a file
-    parser_file = subparsers.add_parser("file", help="single-file mode help")
-    parser_file.add_argument("-p", "--path", type=str, default="/work/tmp/cynthia/bench_000210m/ahn_bench00210.las", help="the path to the input file")
-    parser_file.add_argument("-r", "--ratio", type=float, default=0.7, help="the ratio to split the sfc key")
-    parser_file.add_argument("-n", "--name", type=str, default="delft", help="the name of the point cloud")
-    parser_file.add_argument("-c", "--crs", type=str, default="EPSG:28992", help="the Spatial Reference System of the point cloud")
-    parser_file.add_argument("-d", "--db", type=str, default="cynthia", help='database name')
-    parser_file.add_argument("-U", "--user", type=str, default="cynthia", help='database username')
-    parser_file.add_argument("-k", "--key", type=str, default="123456", help='database password')
-    #parser_file.add_argument("-h", "--host", type=str, default="localhost", help='database host')
-    parser_file.set_defaults(func=file_importer)
-
-    # Mode 2:a directory
-    parser_dir = subparsers.add_parser("dir", help="directory mode help")
-    parser_dir.add_argument("-p", "--path", type=str, default="/work/tmp/cynthia/bench_002201m", help="the path to the input file")
-    parser_dir.add_argument("-r", "--ratio", type=float, default=0.7, help="the ratio to split the sfc key")
-    parser_dir.add_argument("-n", "--name", type=str, default="delft", help="the name of the point cloud")
-    parser_dir.add_argument("-c", "--crs", type=str, default="EPSG:28992", help="the Spatial Reference System of the point cloud")
-    parser_dir.add_argument("-d", "--db", type=str, default="cynthia", help='database name')
-    parser_dir.add_argument("-U", "--user", type=str, default="cynthia", help='database username')
-    parser_dir.add_argument("-k", "--key", type=str, default="123456", help='database password')
-    #parser_dir.add_argument("-h", "--host", type=str, default="localhost", help='database host')
-    parser_dir.set_defaults(func=dir_importer)
-
+    parser = argparse.ArgumentParser(description='Example of argparse usage.')
+    parser.add_argument('--input', type=str, default="./scripts/import.json", help='Input parameter json file path.')
+    parser.add_argument('--password', type=str, default="123456", help='Input parameter json file path.')
     args = parser.parse_args()
-    if hasattr(args, "func"):
+    #jparams_path = "./scripts/import_local.json"
+    jparams_path = args.input
+
+    try:
+        with open(jparams_path, 'r') as f:
+            jparams = json.load(f)
+    except FileNotFoundError:
+        print("ERROR: File not found.")
+    except json.JSONDecodeError as e:
+        print(f"ERROR: JSON decoding error: {e}")
+        sys.exit()
+
+    db_conf = jparams["config"]
+    db_conf["password"] = args.password
+
+    for key, value in jparams["imports"].items():
+        print(f"=== Import {key} ===")
         start_time = time.time()
-        args.func(args)
-        run_time = time.time() - start_time
-        print("The total running time:", run_time)
-    else:
-        parser.print_help()
+        # Load parameters
+        mode = value["mode"]
+        name, srid = key, value["srid"]
+        path, ratio = value["path"], value["ratio"]
+
+        # Read and import metadata
+        # table name: "pc_metadata_" + name
+        meta = MetaProcessor(path, ratio, name, srid)
+        meta.get_meta(mode)
+        meta.store_in_db(db_conf)
+        tail_len = meta.meta[4]
+        print(meta.meta)
+
+        # Read, process and import point records
+        # table name: "pc_record_" + name
+        if mode == "file":
+            importer = PointGroupProcessor(path, tail_len)
+            importer.import_db(db_conf, name)
+        elif mode == "dir":
+            new_path = meta.new_path
+            for input_path in new_path:
+                importer = PointGroupProcessor(input_path, tail_len)
+                importer.import_db(db_conf, name)
+            # TODO: Merge duplicate sfc_head
+
+        print("-->%ss" % round(time.time() - start_time, 2))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
