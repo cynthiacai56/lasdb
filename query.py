@@ -10,7 +10,7 @@ def main():
     parser.add_argument('--input', type=str, default="./scripts/query_20m.json", help='Input parameter json file path.')
     parser.add_argument('--password', type=str, default="123456", help='Input parameter json file path.')
     args = parser.parse_args()
-    # jparams_path = "./scripts/query_20m_local.json"
+    #jparams_path = "./scripts/query_20m_local.json"
     jparams_path = args.input
 
     try:
@@ -30,19 +30,20 @@ def main():
         start_time = time.time()
         source_table = "pc_record_" + value["source_dataset"]
         query_name, mode, geometry = key, value["mode"], value["geometry"]
-        print(f"=== Query {key} from {source_table} ===")
-        print(f"Name: {key}, Mode: {mode}, Geometry: {geometry}")
+        print(f"=== {mode} query {key} from {source_table} ===")
 
-        # perform query
-        query = Querier(head_len, tail_len, db_conf, source_table, query_name)
-        query.geometry_query(mode, geometry)
+        try:
+            query = Querier(head_len, tail_len, db_conf, source_table, query_name)
+            query.geometry_query(mode, geometry)
 
-        if "maxz" in value:
-            query.maxz_query(value["maxz"])
-        if "minz" in value:
-            query.minz_query(value["minz"])
+            if "maxz" in value:
+                query.maxz_query(value["maxz"])
+            if "minz" in value:
+                query.minz_query(value["minz"])
 
-        query.disconnect()
+            query.disconnect()
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
         print("-->%ss" % round(time.time() - start_time, 2))
 
