@@ -33,15 +33,15 @@ def main():
         print(f"=== {mode} query {key} from {source_table} ===")
 
         try:
-            query = Querier(head_len, tail_len, db_conf, source_table, query_name)
-            query.geometry_query(mode, geometry)
+            pipeline = Querier(head_len, tail_len, db_conf, source_table, query_name)
+            pipeline.geometry_query(mode, geometry)
 
             if "maxz" in value:
-                query.maxz_query(value["maxz"])
+                pipeline.maxz_query(value["maxz"])
             if "minz" in value:
-                query.minz_query(value["minz"])
+                pipeline.minz_query(value["minz"])
 
-            query.disconnect()
+            pipeline.disconnect()
         except Exception as e:
             print(f"An error occurred: {e}")
 

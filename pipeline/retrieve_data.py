@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import laspy
 
+from shapely.wkt import loads
 from psycopg2 import connect, Error, extras
 
 from pcsfc.decoder import DecodeMorton2D
@@ -61,22 +62,21 @@ class Querier:
         self.connection.commit()
         print(f"Circle search is updated in {self.name}.")
 
-    def polygon_query(self, polygon_points):
+    def polygon_query(self, wkt_string):
         # 1. Compute bounding box
-        x = [pt[0] for pt in polygon_points]
-        y = [pt[1] for pt in polygon_points]
-        x_min, x_max = min(x), max(x)
-        y_min, y_max = min(y), max(y)
-        bbox = [x_min, x_max, y_min, y_max]
+        polygon = loads(wkt_string)
+        exterior_coords = list(polygon.exterior.coords)
+        x = [pt[0] for pt in exterior_coords]
+        y = [pt[1] for pt in exterior_coords]
+        bbox = [min(x), max(x), min(y), max(y)]
 
         # 2. Range search based on bounding box and create table as intermediate result
         self.range_search(bbox)
 
         # 3. Use PostGIS function to query the points inside the circle, create table as result
-        points_string = ','.join([f"{x} {y}" for x, y in polygon_points])
         polygon_query = f"""
             DELETE FROM {self.name}
-            WHERE NOT ST_Within(point, ST_GeomFromText('POLYGON(({points_string}))'))
+            WHERE NOT ST_Within(point, ST_GeomFromText('{wkt_string}'))
         """
         self.cursor.execute(polygon_query)
         self.connection.commit()

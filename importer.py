@@ -2,7 +2,7 @@ import sys
 import json
 import time
 import argparse
-from pipeline.import_data import MetaProcessor, PointGroupProcessor
+from pipeline.import_data import FileLoader, DirLoader, FullResoLoader
 
 
 def main():
@@ -10,7 +10,7 @@ def main():
     parser.add_argument('--input', type=str, default="./scripts/import.json", help='Input parameter json file path.')
     parser.add_argument('--password', type=str, default="123456", help='Input parameter json file path.')
     args = parser.parse_args()
-    #jparams_path = "./scripts/import_local.json"
+    #jparams_path = "./scripts/import_20m_local.json"
     jparams_path = args.input
 
     try:
@@ -26,32 +26,33 @@ def main():
     db_conf["password"] = args.password
 
     for key, value in jparams["imports"].items():
-        print(f"=== Import {key} ===")
+        print(f"=== Import {key} into PostgreSQL===") # key is name
         start_time = time.time()
-        # Load parameters
-        mode = value["mode"]
-        name, srid = key, value["srid"]
-        path, ratio = value["path"], value["ratio"]
 
-        # Read and import metadata
-        # table name: "pc_metadata_" + name
-        meta = MetaProcessor(path, ratio, name, srid)
-        meta.get_meta(mode)
-        meta.store_in_db(db_conf)
-        tail_len = meta.meta[4]
-        print(meta.meta)
+        try:
+            if value["mode"] == "file":
+                if value["resolution"] == "full":
+                    pipeline = FullResoLoader(value["path"], value["ratio"], key, value["srid"])
+                elif value["resolution"] == "compression":
+                    pipeline = FileLoader(value["path"], value["ratio"], key, value["srid"])
+                pipeline.preparation()
+                initial_time = time.time()
+                print("Initial time:", initial_time - start_time)
+                pipeline.loading(db_conf)
+                load_time = time.time()
+                print("Load time:", load_time - initial_time)
 
-        # Read, process and import point records
-        # table name: "pc_record_" + name
-        if mode == "file":
-            importer = PointGroupProcessor(path, tail_len)
-            importer.import_db(db_conf, name)
-        elif mode == "dir":
-            new_path = meta.new_path
-            for input_path in new_path:
-                importer = PointGroupProcessor(input_path, tail_len)
-                importer.import_db(db_conf, name)
-            # TODO: Merge duplicate sfc_head
+            elif value["mode"] == "dir":
+                pipeline = DirLoader(value["path"], value["ratio"], key, value["srid"])
+                pipeline.preparation()
+                initial_time = time.time()
+                print("Initial time:", initial_time - start_time)
+                pipeline.loading(db_conf)
+                load_time = time.time()
+                print("Load time:", load_time - initial_time)
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
         print("-->%ss" % round(time.time() - start_time, 2))
 

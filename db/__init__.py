@@ -45,8 +45,9 @@ class PgDatabase:
                 name TEXT,
                 srid INT,
                 point_count BIGINT,
-                head_length INT,
-                tail_length INT,
+                ratio DOUBLE PRECISION,
+                scales DOUBLE PRECISION[],
+                offsets DOUBLE PRECISION[],
                 bbox DOUBLE PRECISION[]
             );        
             CREATE TABLE IF NOT EXISTS {table_name_point} (
@@ -88,22 +89,28 @@ class PgDatabase:
             try:
                 self.cursor.copy_expert(sql=f"COPY {table_name} FROM stdin WITH CSV HEADER", file=f)
                 self.connection.commit()
-                #print("Data copied successfully.")
             except Error as e:
                 print("Error: Unable to copy the data.")
                 print(e)
                 self.connection.rollback()
 
     def execute_query(self, data, name="default"):
-        table_name = "pc_record_" + name
-        query = f"SELECT * FROM {table_name} WHERE sfc_head IN %(data)s"
-        self.cursor.execute(query, {'data': tuple(data)})
+        sql = f"SELECT * FROM pc_record_{name} WHERE sfc_head IN %(data)s"
+        self.cursor.execute(sql, {'data': tuple(data)})
         results = self.cursor.fetchall()
 
         for row in results:
             print(row)
 
-    def merge_duplicate(self):
-        return 0
+    def create_btree_index(self, name="default"):
+        sql = f"CREATE INDEX btree_index_{name} ON pc_record_{name} USING btree (sfc_head)"
+        try:
+            self.cursor.execute(sql)
+            self.connection.commit()
+        except Error as e:
+            print(f"Error: Unable to execute query: {sql}")
+            print(e)
+            self.connection.rollback()
+
 
 

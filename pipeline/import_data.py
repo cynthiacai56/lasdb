@@ -4,99 +4,116 @@ import numpy as np
 import pandas as pd
 import laspy
 
-from psycopg2 import connect, Error
-
-from pcsfc.encoder import compute_split_length, process_point, make_groups
+from pcsfc.encoder import compute_split_length, las2csv, las2csv_full
 from db import PgDatabase
 
 
-def dir_importer(args):
-    path, ratio = args.path, args.ratio
-    name, srid = args.name, args.srid
-    db_conf = {
-        "dbname": args.db,
-        "user": args.user,
-        "password": args.key,
-        "host": "localhost",
-        "port": 5432
-    }
-
-    # Process and load the metadata
-    meta = MetaProcessor(path, ratio, name, srid)
-    meta.get_meta_dir()
-    meta.store_in_db(db_conf)
-    new_path = meta.new_path
-    tail_len = meta.meta[4]
-    print(meta.meta)
-
-    # Process and load the points
-    for input_path in new_path:
-        importer = PointGroupProcessor(input_path, tail_len)
-        importer.import_db(db_conf)
-
-    # TODO: Merge duplicate sfc_head
-
-
-def file_importer(args):
-    # Load parameters
-    path, ratio = args.path, args.ratio
-    name, srid = args.name, args.srid
-    db_conf = {
-        "dbname": args.db,
-        "user": args.user,
-        "password": args.key,
-        "host": "localhost",
-        "port": 5432
-    }
-
-    # Load metadata
-    meta = MetaProcessor(path, ratio, name, srid)
-    meta.get_meta_file()
-    meta.store_in_db(db_conf)
-    tail_len = meta.meta[4]
-    print(meta.meta)
-
-    # Read, encode and group the points
-    importer = PointGroupProcessor(path, tail_len)
-    importer.import_db(db_conf)
-
-class MetaProcessor:
+class FileLoader:
     def __init__(self, path, ratio, name, srid):
         self.path = path
         self.ratio = ratio
         self.name = name
         self.srid = srid
-        self.meta = None
-        self.new_path = None
 
-    def get_meta(self, mode):
-        if mode == "file":
-            self.meta = self.get_meta_file()
-        elif mode == "dir":
-            self.meta = self.get_meta_dir()
+        self.head_len = None
+        self.tail_len = None
 
-    def get_meta_file(self):
+        self.meta = self.get_metadata()
+        print(self.meta)
+
+    def get_metadata(self):
+        # name, srid, point_count, head_len, tail_len, scale, offset, bbox
+        scale, offset = [1, 1, 1], [0, 0, 0]
         with laspy.open(self.path) as f:
             point_count = f.header.point_count
-            head_len, tail_len = compute_split_length(int(f.header.x_max), int(f.header.y_max), self.ratio)
             bbox = [f.header.x_min, f.header.x_max, f.header.y_min, f.header.y_max, f.header.z_min, f.header.z_max]
+            self.head_len, self.tail_len = compute_split_length(int(f.header.x_max), int(f.header.y_max), self.ratio)
 
-        meta = [self.name, self.srid, point_count, head_len, tail_len, bbox]
+        meta = [self.name, self.srid, point_count, self.ratio, scale, offset, bbox]
         return meta
 
-    def get_meta_dir(self):
+    def preparation(self):
+        las2csv(self.path, self.tail_len)
+
+    def loading(self, db_conf):
+        db = PgDatabase(db_conf["dbname"], db_conf["user"], db_conf["password"], db_conf["host"], db_conf["port"])
+        db.connect()
+
+        db.create_table(self.name)
+        db.execute_sql(f"INSERT INTO pc_metadata_{self.name} VALUES (%s, %s, %s, %s, %s, %s, %s);", self.meta)
+        db.execute_copy("pc_record.csv", self.name)
+        db.create_btree_index(self.name)
+
+        db.disconnect()
+
+
+class FullResoLoader:
+    def __init__(self, path, ratio, name, srid):
+        self.path = path
+        self.ratio = ratio
+        self.name = name
+        self.srid = srid
+
+        self.head_len = None
+        self.tail_len = None
+
+        self.meta = self.get_metadata()
+        print(self.meta)
+
+    def get_metadata(self):
+        # name, srid, point_count, head_len, tail_len, scale, offset, bbox
+        scale, offset = [0.01, 0.01, 0.01], [0, 0, 0]
+        with laspy.open(self.path) as f:
+            point_count = f.header.point_count
+            bbox = [f.header.x_min, f.header.x_max, f.header.y_min, f.header.y_max, f.header.z_min, f.header.z_max]
+            self.head_len, self.tail_len = compute_split_length(int(f.header.x_max*100), int(f.header.y_max*100), self.ratio)
+
+        meta = [self.name, self.srid, point_count, self.ratio, scale, offset, bbox]
+        return meta
+
+    def preparation(self):
+        las2csv_full(self.path, self.tail_len)
+
+    def loading(self, db_conf):
+        db = PgDatabase(db_conf["dbname"], db_conf["user"], db_conf["password"], db_conf["host"], db_conf["port"])
+        db.connect()
+
+        db.create_table(self.name)
+        db.execute_sql(f"INSERT INTO pc_metadata_{self.name} VALUES (%s, %s, %s, %s, %s, %s, %s);", self.meta)
+        db.execute_copy("pc_record.csv", self.name)
+        db.create_btree_index(self.name)
+
+        db.disconnect()
+
+class DirLoader:
+    def __init__(self, path, ratio, name, srid):
+        self.path = path
+        self.ratio = ratio
+        self.name = name
+        self.srid = srid
+
+        self.path_list = None
+        self.head_len = None
+        self.tail_len = None
+
+        self.meta = self.get_metadata()
+        print(self.meta)
+
+    def get_metadata(self):
         # 1. Get a list of files
         files = self.get_file_names()
-        self.new_path = [self.path + "/" + file for file in files]
+        self.path_list = [self.path + "/" + file for file in files]
+
+        scale, offset = [1, 1, 1], [0, 0, 0]
 
         # 2. Iterate each file, read the header and extract point cloud and bbox
-        with laspy.open(self.new_path[0]) as f:
+        with laspy.open(self.path_list[0]) as f:
             point_count = f.header.point_count
             x_min, y_min, z_min = f.header.x_min, f.header.y_min, f.header.z_min
             x_max, y_max, z_max = f.header.x_max, f.header.y_max, f.header.z_max
 
-        for i in range(1, len(self.new_path)):
-            with laspy.open(self.new_path[i]) as f:
+        for i in range(1, len(self.path_list)):
+            with laspy.open(self.path_list[i]) as f:
                 point_count += f.header.point_count
                 x_min = min(x_min, f.header.x_min)
                 x_max = max(x_max, f.header.x_max)
@@ -107,15 +124,27 @@ class MetaProcessor:
         bbox = [x_min, x_max, y_min, y_max, z_min, z_max]
 
         # 3. Based on the bbox of the whole point cloud, determine head_length and tail_length
-        head_len, tail_len = compute_split_length(int(x_min), int(y_max), self.ratio)
-        meta = [self.name, self.srid, point_count, head_len, tail_len, bbox]
+        self.head_len, self.tail_len = compute_split_length(int(x_min), int(y_max), self.ratio)
+        meta = [self.name, self.srid, point_count, self.ratio, scale, offset, bbox]
         return meta
 
-    def store_in_db(self, db_conf):
+    def preparation(self):
+        for i in range(len(self.path_list)):
+            filename = f"pc_record_{i}.csv"
+            las2csv(self.path_list[i], self.tail_len, filename)
+
+    def loading(self, db_conf):
         db = PgDatabase(db_conf["dbname"], db_conf["user"], db_conf["password"], db_conf["host"], db_conf["port"])
         db.connect()
+
         db.create_table(self.name)
-        db.execute_sql(f"INSERT INTO pc_metadata_{self.name} VALUES (%s, %s, %s, %s, %s, %s);", self.meta)
+        db.execute_sql(f"INSERT INTO pc_metadata_{self.name} VALUES (%s, %s, %s, %s, %s, %s, %s);", self.meta)
+
+        for i in range(len(self.path_list)):
+            filename = f"pc_record_{i}.csv"
+            db.execute_copy(filename, self.name)
+
+        db.create_btree_index(self.name)
         db.disconnect()
 
     def get_file_names(self):
@@ -126,45 +155,3 @@ class MetaProcessor:
 
         file_names = [file_path.name for file_path in directory_path.glob('*') if file_path.is_file()]
         return file_names
-
-
-class PointGroupProcessor:
-    def __init__(self, path, tail_len):
-        with laspy.open(path) as f:
-            point_count = f.header.point_count
-
-        if point_count <= 50000000:
-            self.process_points(path, tail_len)
-        else:
-            self.process_points_chunk(path, tail_len)
-
-    def process_points(self, path, tail_len):
-        las = laspy.read(path)
-        points = np.vstack((las.x, las.y, las.z)).transpose()
-        encoded_pts = [process_point(pt, tail_len) for pt in points]
-
-        pc_groups = make_groups(encoded_pts)
-        self.write_csv(pc_groups)
-
-    def process_points_chunk(self, path, tail_len):
-        encoded_pts = []
-        with laspy.open(path) as f:
-            for points in f.chunk_iterator(50000000):
-                pts = np.vstack((points.x, points.y, points.z)).transpose()
-                encoded_pts = encoded_pts + [process_point(pt, tail_len) for pt in pts]
-
-        pc_groups = make_groups(encoded_pts)
-        self.write_csv(pc_groups)
-
-    def write_csv(self, pc_groups):
-        df = pd.DataFrame(pc_groups, columns=['sfc_head','sfc_tail','z'])
-        df['sfc_tail'] = df['sfc_tail'].apply(lambda x: str(x).replace('[', '{').replace(']', '}'))
-        df['z'] = df['z'].apply(lambda x: str(x).replace('[', '{').replace(']', '}'))
-        df.to_csv("pc_record.csv", index=False, mode='w')
-
-    def import_db(self, db_conf, name):
-        db = PgDatabase(db_conf["dbname"], db_conf["user"], db_conf["password"], db_conf["host"], db_conf["port"])
-        db.connect()
-        table_name = "pc_record_" + name
-        db.execute_copy("pc_record.csv", name)
-        db.disconnect()

@@ -22,12 +22,9 @@ def morton_range(bbox, start, body_len, end_len):
 
             # Fully containment
             if xs_min >= x_min and xs_max <= x_max and ys_min >= y_min and ys_max <= y_max:
-                #ranges.append(((slice_min >> end_len) - start, (slice_max >> end_len) - start))
-                #ranges.append(((slice_min >> end_len) - (start << body_len), (slice_max >> end_len) - (start << body_len)))
                 slice_min_lol = (slice_min >> end_len) - (start << body_len)
                 slice_max_lol = (slice_max >> end_len) - (start << body_len)
                 ranges.append([slice_min_lol, slice_max_lol])
-                #ranges.append((slice_min >> end_len, slice_max >> end_len))
                 #print(slice_min, slice_max, 'fully contained')
             # No containment
             elif xs_max < x_min or xs_min > x_max or ys_max < y_min or ys_min > y_max:
@@ -45,8 +42,6 @@ def morton_range(bbox, start, body_len, end_len):
         if len(fronts) == 0:
             break
 
-    #overlaps_shift = [(key >> end_len) - (start - body_len) for key in overlaps]
-    #overlaps_shift = [key >> end_len for key in overlaps]
     overlaps_shift = [(key >> end_len) - (start << body_len)for key in overlaps]
     #overlaps_shift =
     return ranges, overlaps_shift

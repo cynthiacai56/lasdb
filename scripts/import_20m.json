@@ -7,11 +7,12 @@
     "port": 5432
   },
   "imports": {
-      "20m": {
-        "mode": "file",
-        "srid": 28992,
-        "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
-        "ratio": 0.7
-      }
+    "20m": {
+      "mode": "file",
+      "resolution": "compression",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "ratio": 0.7
+    }
   }
 }

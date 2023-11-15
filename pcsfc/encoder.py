@@ -1,6 +1,9 @@
 import numpy as np
+import pandas as pd
+import laspy
 from itertools import groupby
 from numba import jit, int32, int64
+
 
 ###############################################################################
 ######################      Morton conversion in 2D      ######################
@@ -66,6 +69,7 @@ def compute_split_length(x, y, ratio):
         head_len = head_len - 1
 
     tail_len = length - head_len
+    print(f"Key length | full: {length}, head: {head_len}, tail: {tail_len}")
     return head_len, tail_len
 
 
@@ -85,3 +89,59 @@ def make_groups(lst):
         zz.append(yy)
 
     return zz
+
+
+def las2csv(path, tail_len, filename="pc_record.csv"):
+    max_count = 500000000
+
+    # Encode Morton key for all points
+    with laspy.open(path) as f:
+        point_count = f.header.point_count
+
+    if point_count < max_count:
+        las = laspy.read(path)
+        points = np.vstack((las.x, las.y, las.z)).transpose()
+        encoded_pts = [process_point(pt, tail_len) for pt in points]
+    else:
+        encoded_pts = []
+        with laspy.open(path) as f:
+            for points in f.chunk_iterator(max_count):
+                pts = np.vstack((points.x, points.y, points.z)).transpose()
+                encoded_pts = encoded_pts + [process_point(pt, tail_len) for pt in pts]
+
+    # Sort and group the points
+    pc_groups = make_groups(encoded_pts)
+
+    # Write the point group in csv file
+    df = pd.DataFrame(pc_groups, columns=['sfc_head','sfc_tail','z'])
+    df['sfc_tail'] = df['sfc_tail'].apply(lambda x: str(x).replace('[', '{').replace(']', '}'))
+    df['z'] = df['z'].apply(lambda x: str(x).replace('[', '{').replace(']', '}'))
+    df.to_csv(filename, index=False, mode='w')
+
+
+def las2csv_full(path, tail_len, filename="pc_record.csv"):
+    max_count = 500000000
+
+    # Encode Morton key for all points
+    with laspy.open(path) as f:
+        point_count = f.header.point_count
+
+    if point_count < max_count:
+        las = laspy.read(path)
+        points = np.vstack((las.X, las.Y, las.Z)).transpose()
+        encoded_pts = [process_point(pt, tail_len) for pt in points]
+    else:
+        encoded_pts = []
+        with laspy.open(path) as f:
+            for points in f.chunk_iterator(max_count):
+                pts = np.vstack((points.X, points.Y, points.Z)).transpose()
+                encoded_pts = encoded_pts + [process_point(pt, tail_len) for pt in pts]
+
+    # Sort and group the points
+    pc_groups = make_groups(encoded_pts)
+
+    # Write the point group in csv file
+    df = pd.DataFrame(pc_groups, columns=['sfc_head','sfc_tail','z'])
+    df['sfc_tail'] = df['sfc_tail'].apply(lambda x: str(x).replace('[', '{').replace(']', '}'))
+    df['z'] = df['z'].apply(lambda x: str(x).replace('[', '{').replace(']', '}'))
+    df.to_csv(filename, index=False, mode='w')
