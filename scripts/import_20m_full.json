@@ -14,7 +14,7 @@
       "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
       "ratio": 0.5
     },
-    "20m_full_50": {
+    "20m_full_55": {
       "mode": "file",
       "resolution": "full",
       "srid": 28992,
@@ -34,6 +34,13 @@
       "srid": 28992,
       "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
       "ratio": 0.65
+    },
+    "20m_full_70": {
+      "mode": "file",
+      "resolution": "full",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "ratio": 0.70
     }
   }
 }
