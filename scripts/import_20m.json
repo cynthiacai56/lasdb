@@ -9,9 +9,10 @@
   "imports": {
     "20m": {
       "mode": "file",
-      "resolution": "compression",
       "srid": 28992,
       "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [1, 1, 1],
+      "offsets": [0, 0, 0],
       "ratio": 0.7
     }
   }

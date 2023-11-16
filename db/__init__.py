@@ -1,24 +1,39 @@
 from psycopg2 import connect, Error, extras
 
 
-class PgDatabase:
-    def __init__(self, dbname, user, password, host, port):
-        self.dbname = dbname
-        self.user = user
-        self.password = password
-        self.host = host
-        self.port = port
+class Postgres:
+    def __init__(self, db_conf, name):
+        self.db_conf = db_conf
         self.connection = None
         self.cursor = None
+
+        self.meta_table = "pc_metadata_" + name
+        self.point_table = "pc_record_" + name
+        self.btree_index = "btree_" + name
+
+    def load(self, metadata, file="pc_record.csv"):
+        self.connect()
+
+        self.create_table()
+        self.insert_metadata(metadata)
+
+        if isinstance(file, str):
+            self.copy_points(file)
+        elif isinstance(file, list):
+            for f in file:
+                self.copy_points(f)
+
+        self.create_btree_index()
+        self.disconnect()
 
     def connect(self):
         try:
             self.connection = connect(
-                dbname=self.dbname,
-                user=self.user,
-                password=self.password,
-                host=self.host,
-                port=self.port
+                dbname=self.db_conf["dbname"],
+                user=self.db_conf["user"],
+                password=self.db_conf["password"],
+                host=self.db_conf["host"],
+                port=self.db_conf["port"]
             )
             self.cursor = self.connection.cursor()
         except Error as e:
@@ -37,11 +52,9 @@ class PgDatabase:
             print("Error: Database connection is not established.")
             return
 
-        table_name_meta = "pc_metadata_" + name
-        table_name_point = "pc_record_" + name
         create_table_sql = f"""
             CREATE EXTENSION IF NOT EXISTS postgis;
-            CREATE TABLE IF NOT EXISTS {table_name_meta} (
+            CREATE TABLE IF NOT EXISTS {self.meta_table} (
                 name TEXT,
                 srid INT,
                 point_count BIGINT,
@@ -50,7 +63,7 @@ class PgDatabase:
                 offsets DOUBLE PRECISION[],
                 bbox DOUBLE PRECISION[]
             );        
-            CREATE TABLE IF NOT EXISTS {table_name_point} (
+            CREATE TABLE IF NOT EXISTS {self.point_table} (
                 sfc_head INT,
                 sfc_tail INT[],
                 z DOUBLE PRECISION[]
@@ -79,15 +92,27 @@ class PgDatabase:
             print(e)
             self.connection.rollback()
 
-    def execute_copy(self, filename, name="default"):
+    def insert_metadata(self, data):
         if not self.connection:
             print("Error: Database connection is not established.")
             return
 
-        table_name = "pc_record_" + name
-        with open(filename, 'r') as f:
+        try:
+            self.cursor.execute(f"INSERT INTO {self.meta_table} VALUES (%s, %s, %s, %s, %s, %s, %s);", data)
+            self.connection.commit()
+        except Error as e:
+            print(f"Error: Unable to insert metadata.")
+            print(e)
+            self.connection.rollback()
+
+    def copy_points(self, file):
+        if not self.connection:
+            print("Error: Database connection is not established.")
+            return
+
+        with open(file, 'r') as f:
             try:
-                self.cursor.copy_expert(sql=f"COPY {table_name} FROM stdin WITH CSV HEADER", file=f)
+                self.cursor.copy_expert(sql=f"COPY {self.point_table} FROM stdin WITH CSV HEADER", file=f)
                 self.connection.commit()
             except Error as e:
                 print("Error: Unable to copy the data.")
@@ -95,15 +120,16 @@ class PgDatabase:
                 self.connection.rollback()
 
     def execute_query(self, data, name="default"):
-        sql = f"SELECT * FROM pc_record_{name} WHERE sfc_head IN %(data)s"
+        sql = f"SELECT * FROM {self.point_table} WHERE sfc_head IN %(data)s"
         self.cursor.execute(sql, {'data': tuple(data)})
         results = self.cursor.fetchall()
 
         for row in results:
             print(row)
 
+
     def create_btree_index(self, name="default"):
-        sql = f"CREATE INDEX btree_index_{name} ON pc_record_{name} USING btree (sfc_head)"
+        sql = f"CREATE INDEX {self.btree_index} ON {self.point_table} USING btree (sfc_head)"
         try:
             self.cursor.execute(sql)
             self.connection.commit()

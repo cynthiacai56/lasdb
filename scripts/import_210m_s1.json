@@ -7,26 +7,29 @@
     "port": 5432
   },
   "imports": {
-    "210m_full_50": {
+    "210m_s1_65": {
       "mode": "file",
-      "resolution": "full",
       "srid": 28992,
       "path": "/work/tmp/cynthia/bench_000210m/ahn_bench000210.las",
-      "ratio": 0.5
+      "scales": [1, 1, 1],
+      "offsets": [0, 0, 0],
+      "ratio": 0.65
     },
-    "210m_full_55": {
+    "210m_s1_70": {
       "mode": "file",
-      "resolution": "full",
       "srid": 28992,
       "path": "/work/tmp/cynthia/bench_000210m/ahn_bench000210.las",
-      "ratio": 0.55
+      "scales": [1, 1, 1],
+      "offsets": [0, 0, 0],
+      "ratio": 0.7
     },
-    "210m_full_60": {
+    "210m_s1_75": {
       "mode": "file",
-      "resolution": "full",
       "srid": 28992,
       "path": "/work/tmp/cynthia/bench_000210m/ahn_bench000210.las",
-      "ratio": 0.6
+      "scales": [1, 1, 1],
+      "offsets": [0, 0, 0],
+      "ratio": 0.75
     }
   }
 }

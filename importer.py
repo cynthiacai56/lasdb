@@ -2,7 +2,7 @@ import sys
 import json
 import time
 import argparse
-from pipeline.import_data import FileLoader, DirLoader, FullResoLoader
+from pipeline.import_data import FileLoader, DirLoader
 
 
 def main():
@@ -10,7 +10,7 @@ def main():
     parser.add_argument('--input', type=str, default="./scripts/import.json", help='Input parameter json file path.')
     parser.add_argument('--password', type=str, default="123456", help='Input parameter json file path.')
     args = parser.parse_args()
-    #jparams_path = "./scripts/import_20m_local.json"
+    jparams_path = "scripts/import_20m_s3.json"
     jparams_path = args.input
 
     try:
@@ -31,10 +31,7 @@ def main():
 
         try:
             if value["mode"] == "file":
-                if value["resolution"] == "full":
-                    pipeline = FullResoLoader(value["path"], value["ratio"], key, value["srid"])
-                elif value["resolution"] == "compression":
-                    pipeline = FileLoader(value["path"], value["ratio"], key, value["srid"])
+                pipeline = FileLoader(key, value)
                 pipeline.preparation()
                 initial_time = time.time()
                 print("Initial time:", initial_time - start_time)
@@ -43,7 +40,7 @@ def main():
                 print("Load time:", load_time - initial_time)
 
             elif value["mode"] == "dir":
-                pipeline = DirLoader(value["path"], value["ratio"], key, value["srid"])
+                pipeline = DirLoader(key, value)
                 pipeline.preparation()
                 initial_time = time.time()
                 print("Initial time:", initial_time - start_time)

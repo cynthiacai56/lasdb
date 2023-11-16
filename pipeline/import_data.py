@@ -1,19 +1,21 @@
 import os
-from pathlib import Path
 import numpy as np
 import pandas as pd
 import laspy
 
-from pcsfc.encoder import compute_split_length, las2csv, las2csv_full
-from db import PgDatabase
+from pcsfc.point_processor import compute_split_length, PointProcessor
+from db import Postgres
 
 
 class FileLoader:
-    def __init__(self, path, ratio, name, srid):
-        self.path = path
-        self.ratio = ratio
+    def __init__(self, name, dict):
         self.name = name
-        self.srid = srid
+        self.path = dict["path"]
+        self.srid = dict["srid"]
+        self.ratio = dict["ratio"]
+
+        self.scales = dict["scales"]
+        self.offsets = dict["offsets"]
 
         self.head_len = None
         self.tail_len = None
@@ -23,76 +25,36 @@ class FileLoader:
 
     def get_metadata(self):
         # name, srid, point_count, head_len, tail_len, scale, offset, bbox
-        scale, offset = [1, 1, 1], [0, 0, 0]
         with laspy.open(self.path) as f:
             point_count = f.header.point_count
             bbox = [f.header.x_min, f.header.x_max, f.header.y_min, f.header.y_max, f.header.z_min, f.header.z_max]
-            self.head_len, self.tail_len = compute_split_length(int(f.header.x_max), int(f.header.y_max), self.ratio)
 
-        meta = [self.name, self.srid, point_count, self.ratio, scale, offset, bbox]
+            X_max = round((f.header.x_max - self.offsets[0]) / self.scales[0])
+            Y_max = round((f.header.y_max - self.offsets[1]) / self.scales[1])
+            self.head_len, self.tail_len = compute_split_length(X_max, Y_max, self.ratio)
+
+        meta = [self.name, self.srid, point_count, round(self.ratio, 2), self.scales, self.offsets, bbox]
         return meta
 
     def preparation(self):
-        las2csv(self.path, self.tail_len)
+        processor = PointProcessor(self.path, self.tail_len, self.scales, self.offsets)
+        processor.execute()
 
     def loading(self, db_conf):
-        db = PgDatabase(db_conf["dbname"], db_conf["user"], db_conf["password"], db_conf["host"], db_conf["port"])
-        db.connect()
+        db = Postgres(db_conf, self.name)
+        db.load(self.meta, "pc_record.csv")
 
-        db.create_table(self.name)
-        db.execute_sql(f"INSERT INTO pc_metadata_{self.name} VALUES (%s, %s, %s, %s, %s, %s, %s);", self.meta)
-        db.execute_copy("pc_record.csv", self.name)
-        db.create_btree_index(self.name)
-
-        db.disconnect()
-
-
-class FullResoLoader:
-    def __init__(self, path, ratio, name, srid):
-        self.path = path
-        self.ratio = ratio
-        self.name = name
-        self.srid = srid
-
-        self.head_len = None
-        self.tail_len = None
-
-        self.meta = self.get_metadata()
-        print(self.meta)
-
-    def get_metadata(self):
-        # name, srid, point_count, head_len, tail_len, scale, offset, bbox
-        scale, offset = [0.01, 0.01, 0.01], [0, 0, 0]
-        with laspy.open(self.path) as f:
-            point_count = f.header.point_count
-            bbox = [f.header.x_min, f.header.x_max, f.header.y_min, f.header.y_max, f.header.z_min, f.header.z_max]
-            self.head_len, self.tail_len = compute_split_length(int(f.header.x_max*100), int(f.header.y_max*100), self.ratio)
-
-        meta = [self.name, self.srid, point_count, self.ratio, scale, offset, bbox]
-        return meta
-
-    def preparation(self):
-        las2csv_full(self.path, self.tail_len)
-
-    def loading(self, db_conf):
-        db = PgDatabase(db_conf["dbname"], db_conf["user"], db_conf["password"], db_conf["host"], db_conf["port"])
-        db.connect()
-
-        db.create_table(self.name)
-        db.execute_sql(f"INSERT INTO pc_metadata_{self.name} VALUES (%s, %s, %s, %s, %s, %s, %s);", self.meta)
-        db.execute_copy("pc_record.csv", self.name)
-        db.create_btree_index(self.name)
-
-        db.disconnect()
 
 class DirLoader:
-    def __init__(self, path, ratio, name, srid):
-        self.path = path
-        self.ratio = ratio
+    def __init__(self, name, dict):
         self.name = name
-        self.srid = srid
+        self.path = dict["path"]
+        self.srid = dict["srid"]
+        self.ratio = dict["ratio"]
 
-        self.path_list = None
+        self.scales = dict["scales"]
+        self.offsets = dict["offsets"]
+
         self.head_len = None
         self.tail_len = None
 
@@ -100,20 +62,16 @@ class DirLoader:
         print(self.meta)
 
     def get_metadata(self):
-        # 1. Get a list of files
-        files = self.get_file_names()
-        self.path_list = [self.path + "/" + file for file in files]
-
-        scale, offset = [1, 1, 1], [0, 0, 0]
-
-        # 2. Iterate each file, read the header and extract point cloud and bbox
-        with laspy.open(self.path_list[0]) as f:
+        # 1. Iterate each file, read the header and extract point cloud and bbox
+        with laspy.open(self.paths[0]) as f:
             point_count = f.header.point_count
             x_min, y_min, z_min = f.header.x_min, f.header.y_min, f.header.z_min
             x_max, y_max, z_max = f.header.x_max, f.header.y_max, f.header.z_max
 
-        for i in range(1, len(self.path_list)):
-            with laspy.open(self.path_list[i]) as f:
+        scale, offset = [1, 1, 1], [0, 0, 0]
+
+        for i in range(1, len(self.paths)):
+            with laspy.open(self.paths[i]) as f:
                 point_count += f.header.point_count
                 x_min = min(x_min, f.header.x_min)
                 x_max = max(x_max, f.header.x_max)
@@ -123,35 +81,22 @@ class DirLoader:
                 z_max = max(z_max, f.header.z_max)
         bbox = [x_min, x_max, y_min, y_max, z_min, z_max]
 
-        # 3. Based on the bbox of the whole point cloud, determine head_length and tail_length
-        self.head_len, self.tail_len = compute_split_length(int(x_min), int(y_max), self.ratio)
+        # 2. Based on the bbox of the whole point cloud, determine head_length and tail_length
+        self.head_len, self.tail_len = compute_split_length(round(x_min), round(y_max), self.ratio)
         meta = [self.name, self.srid, point_count, self.ratio, scale, offset, bbox]
         return meta
 
     def preparation(self):
         for i in range(len(self.path_list)):
             filename = f"pc_record_{i}.csv"
-            las2csv(self.path_list[i], self.tail_len, filename)
+            processor = PointProcessor(self.file_paths, self.tail_len)
+            processor.execute(filename)
 
     def loading(self, db_conf):
-        db = PgDatabase(db_conf["dbname"], db_conf["user"], db_conf["password"], db_conf["host"], db_conf["port"])
-        db.connect()
+        file_list = []
+        db = Postgres(db_conf)
+        db.load(self.metadata, file_list)
 
-        db.create_table(self.name)
-        db.execute_sql(f"INSERT INTO pc_metadata_{self.name} VALUES (%s, %s, %s, %s, %s, %s, %s);", self.meta)
-
-        for i in range(len(self.path_list)):
-            filename = f"pc_record_{i}.csv"
-            db.execute_copy(filename, self.name)
-
-        db.create_btree_index(self.name)
-        db.disconnect()
-
-    def get_file_names(self):
-        directory_path = Path(self.path)
-        if not directory_path.is_dir():
-            print(f"Error: {directory_path} is not a valid directory.")
-            return []
-
-        file_names = [file_path.name for file_path in directory_path.glob('*') if file_path.is_file()]
-        return file_names
+    def get_file_paths(self, dir_path):
+        return [os.path.join(dir_path, file) for file in os.listdir(dir_path) if
+                      os.path.isfile(os.path.join(dir_path, file))]
