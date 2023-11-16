@@ -1,0 +1,75 @@
+{
+  "config": {
+    "dbname": "cynthia",
+    "user": "cynthia",
+    "password": "050694",
+    "host": "localhost",
+    "port": 5432
+  },
+  "imports": {
+    "20m_s3_15": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 1],
+      "offsets": [85000, 446250, 0],
+      "ratio": 0.15
+    },
+    "20m_s3_20": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 1],
+      "offsets": [85000, 446250, 0],
+      "ratio": 0.2
+    },
+    "20m_s3_25": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 1],
+      "offsets": [85000, 446250, 0],
+      "ratio": 0.25
+    },
+    "20m_s3_35": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 1],
+      "offsets": [85000, 446250, 0],
+      "ratio": 0.35
+    },
+    "20m_s3_40": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 1],
+      "offsets": [85000, 446250, 0],
+      "ratio": 0.4
+    },
+    "20m_s3_45": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 1],
+      "offsets": [85000, 446250, 0],
+      "ratio": 0.45
+    },
+    "20m_s3_50": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 1],
+      "offsets": [85000, 446250, 0],
+      "ratio": 0.50
+    },
+    "20m_s3_55": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 1],
+      "offsets": [85000, 446250, 0],
+      "ratio": 0.55
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "config": {
+    "dbname": "cynthia",
+    "user": "cynthia",
+    "password": "050694",
+    "host": "localhost",
+    "port": 5432
+  },
+  "imports": {
+    "20m_s2_50": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "E:\\Geomatics\\GEO2020 Thesis\\data\\ahn_bench000020.las",
+      "scales": [0.01, 0.01, 0.01],
+      "offsets": [0, 0, 0],
+      "ratio": 0.5
+    },
+    "20m_s2_55": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "E:\\Geomatics\\GEO2020 Thesis\\data\\ahn_bench000020.las",
+      "scales": [0.01, 0.01, 0.01],
+      "offsets": [0, 0, 0],
+      "ratio": 0.55
+    },
+    "20m_s2_60": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 0.01],
+      "offsets": [0, 0, 0],
+      "ratio": 0.6
+    },
+    "20m_s2_65": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 0.01],
+      "offsets": [0, 0, 0],
+      "ratio": 0.65
+    },
+    "20m_s2_70": {
+      "mode": "file",
+      "srid": 28992,
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
+      "scales": [0.01, 0.01, 0.01],
+      "offsets": [0, 0, 0],
+      "ratio": 0.70
+    }
+  }
+}
