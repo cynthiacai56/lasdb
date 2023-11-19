@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -28,7 +29,8 @@ class PointProcessor:
         self.scales = scales
         self.offsets = offsets
 
-    def execute(self, filename="pc_record.csv"):
+    def execute(self, filename="./cache/pc_record.csv"):
+        #start_time = time.time()
         max_count = 500000000
         with laspy.open(self.path) as f:
             point_count = f.header.point_count
@@ -38,9 +40,14 @@ class PointProcessor:
             points = np.vstack((las.x, las.y, las.z)).transpose()
             encoded_pts = self.encode_split_points(points)
 
+        #encode_time = time.time()
+        #print("Encoding time:", round(encode_time - start_time, 2))
+
         # Sort and group the points
         pt_blocks = self.make_groups(encoded_pts)
         self.write_csv(pt_blocks, filename)
+
+        #print("Groupby time:", round(time.time() - encode_time, 2))
 
     def encode_split_points(self, points):
         encoded_points = []

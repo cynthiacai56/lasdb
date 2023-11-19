@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import pandas as pd
 import laspy
@@ -42,13 +43,13 @@ class FileLoader:
 
     def loading(self, db_conf):
         db = Postgres(db_conf, self.name)
-        db.load(self.meta, "pc_record.csv")
+        db.load(self.meta, f"./cache/{self.name}.csv")
 
 
 class DirLoader:
     def __init__(self, name, dict):
         self.name = name
-        self.path = dict["path"]
+        self.paths = self.get_file_paths(dict["path"])
         self.srid = dict["srid"]
         self.ratio = dict["ratio"]
 
@@ -57,6 +58,7 @@ class DirLoader:
 
         self.head_len = None
         self.tail_len = None
+        self.csv_list = None
 
         self.meta = self.get_metadata()
         print(self.meta)
@@ -68,7 +70,7 @@ class DirLoader:
             x_min, y_min, z_min = f.header.x_min, f.header.y_min, f.header.z_min
             x_max, y_max, z_max = f.header.x_max, f.header.y_max, f.header.z_max
 
-        scale, offset = [1, 1, 1], [0, 0, 0]
+        scales, offsets = [1, 1, 1], [0, 0, 0]
 
         for i in range(1, len(self.paths)):
             with laspy.open(self.paths[i]) as f:
@@ -83,19 +85,22 @@ class DirLoader:
 
         # 2. Based on the bbox of the whole point cloud, determine head_length and tail_length
         self.head_len, self.tail_len = compute_split_length(round(x_min), round(y_max), self.ratio)
-        meta = [self.name, self.srid, point_count, self.ratio, scale, offset, bbox]
+        meta = [self.name, self.srid, point_count, self.ratio, self.scales, self.offsets, bbox]
         return meta
 
     def preparation(self):
-        for i in range(len(self.path_list)):
-            filename = f"pc_record_{i}.csv"
-            processor = PointProcessor(self.file_paths, self.tail_len)
+        csv_list = []
+        for i in range(len(self.paths)):
+            filename = f"./cache/pc_record_{i}.csv"
+            csv_list.append(filename)
+            processor = PointProcessor(self.paths[i], self.tail_len, self.scales, self.offsets)
             processor.execute(filename)
+            print(filename, 'saved.')
+        self.csv_list = csv_list
 
     def loading(self, db_conf):
-        file_list = []
-        db = Postgres(db_conf)
-        db.load(self.metadata, file_list)
+        db = Postgres(db_conf, self.name)
+        db.load(self.meta, self.csv_list)
 
     def get_file_paths(self, dir_path):
         return [os.path.join(dir_path, file) for file in os.listdir(dir_path) if

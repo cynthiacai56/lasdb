@@ -1,3 +1,4 @@
+import time
 from psycopg2 import connect, Error, extras
 
 
@@ -11,7 +12,8 @@ class Postgres:
         self.point_table = "pc_record_" + name
         self.btree_index = "btree_" + name
 
-    def load(self, metadata, file="pc_record.csv"):
+    def load(self, metadata, file="./cache/pc_record.csv"):
+        start_time = time.time()
         self.connect()
 
         self.create_table()
@@ -23,8 +25,12 @@ class Postgres:
             for f in file:
                 self.copy_points(f)
 
+        load_time = time.time()
+        print("Loading time:", round(load_time - start_time, 2))
+
         self.create_btree_index()
         self.disconnect()
+        print("Close time:", round(time.time() - load_time, 2))
 
     def connect(self):
         try:
