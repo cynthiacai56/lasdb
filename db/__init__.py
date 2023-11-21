@@ -1,4 +1,3 @@
-import time
 from psycopg2 import connect, Error, extras
 
 
@@ -12,25 +11,6 @@ class Postgres:
         self.point_table = "pc_record_" + name
         self.btree_index = "btree_" + name
 
-    def load(self, metadata, file="./cache/pc_record.csv"):
-        start_time = time.time()
-        self.connect()
-
-        self.create_table()
-        self.insert_metadata(metadata)
-
-        if isinstance(file, str):
-            self.copy_points(file)
-        elif isinstance(file, list):
-            for f in file:
-                self.copy_points(f)
-
-        load_time = time.time()
-        print("Loading time:", round(load_time - start_time, 2))
-
-        self.create_btree_index()
-        self.disconnect()
-        print("Close time:", round(time.time() - load_time, 2))
 
     def connect(self):
         try:
@@ -64,7 +44,8 @@ class Postgres:
                 name TEXT,
                 srid INT,
                 point_count BIGINT,
-                ratio DOUBLE PRECISION,
+                head_length INT,
+                tail_length INT,
                 scales DOUBLE PRECISION[],
                 offsets DOUBLE PRECISION[],
                 bbox DOUBLE PRECISION[]
@@ -104,14 +85,14 @@ class Postgres:
             return
 
         try:
-            self.cursor.execute(f"INSERT INTO {self.meta_table} VALUES (%s, %s, %s, %s, %s, %s, %s);", data)
+            self.cursor.execute(f"INSERT INTO {self.meta_table} VALUES (%s, %s, %s, %s, %s, %s, %s, %s);", data)
             self.connection.commit()
         except Error as e:
             print(f"Error: Unable to insert metadata.")
             print(e)
             self.connection.rollback()
 
-    def copy_points(self, file):
+    def copy_points(self, file="pc_record.csv"):
         if not self.connection:
             print("Error: Database connection is not established.")
             return

@@ -17,8 +17,6 @@ class FileLoader:
 
         self.scales = dict["scales"]
         self.offsets = dict["offsets"]
-
-        self.head_len = None
         self.tail_len = None
 
         self.meta = self.get_metadata()
@@ -32,9 +30,9 @@ class FileLoader:
 
             X_max = round((f.header.x_max - self.offsets[0]) / self.scales[0])
             Y_max = round((f.header.y_max - self.offsets[1]) / self.scales[1])
-            self.head_len, self.tail_len = compute_split_length(X_max, Y_max, self.ratio)
+            head_len, self.tail_len = compute_split_length(X_max, Y_max, self.ratio)
 
-        meta = [self.name, self.srid, point_count, round(self.ratio, 2), self.scales, self.offsets, bbox]
+        meta = [self.name, self.srid, point_count, head_len, self.tail_len, self.scales, self.offsets, bbox]
         return meta
 
     def preparation(self):
@@ -42,8 +40,20 @@ class FileLoader:
         processor.execute()
 
     def loading(self, db_conf):
+        start_time = time.time()
         db = Postgres(db_conf, self.name)
-        db.load(self.meta, f"./cache/{self.name}.csv")
+        db.connect()
+
+        db.create_table()
+        db.insert_metadata(self.meta)
+        db.copy_points()
+
+        load_time = time.time()
+        print("-> Loading time:", round(load_time - start_time, 2))
+
+        db.create_btree_index()
+        db.disconnect()
+        print("-> Close time:", round(time.time() - load_time, 2))
 
 
 class DirLoader:
@@ -56,11 +66,11 @@ class DirLoader:
         self.scales = dict["scales"]
         self.offsets = dict["offsets"]
 
-        self.head_len = None
         self.tail_len = None
         self.csv_list = None
 
         self.meta = self.get_metadata()
+        print("The number of files: ", len(self.paths))
         print(self.meta)
 
     def get_metadata(self):
@@ -84,23 +94,47 @@ class DirLoader:
         bbox = [x_min, x_max, y_min, y_max, z_min, z_max]
 
         # 2. Based on the bbox of the whole point cloud, determine head_length and tail_length
-        self.head_len, self.tail_len = compute_split_length(round(x_min), round(y_max), self.ratio)
-        meta = [self.name, self.srid, point_count, self.ratio, self.scales, self.offsets, bbox]
+        head_len, self.tail_len = compute_split_length(round(x_min), round(y_max), self.ratio)
+        meta = [self.name, self.srid, point_count, head_len, self.tail_len, self.scales, self.offsets, bbox]
         return meta
 
-    def preparation(self):
-        csv_list = []
-        for i in range(len(self.paths)):
-            filename = f"./cache/pc_record_{i}.csv"
-            csv_list.append(filename)
-            processor = PointProcessor(self.paths[i], self.tail_len, self.scales, self.offsets)
-            processor.execute(filename)
-            print(filename, 'saved.')
-        self.csv_list = csv_list
-
-    def loading(self, db_conf):
+    def run(self, db_conf):
         db = Postgres(db_conf, self.name)
-        db.load(self.meta, self.csv_list)
+        db.connect()
+
+        db.create_table()
+        db.insert_metadata(self.meta)
+
+        load_time_count = 0
+        for i in range(len(self.paths)):
+            # Preparation: Encode, split and group the Morton keys
+            processor = PointProcessor(self.paths[i], self.tail_len, self.scales, self.offsets)
+            processor.execute()
+
+            # Import the data into the database
+            load_time_1 = time.time()
+            db = Postgres(db_conf, self.name)
+            db.connect()
+            if i == 0:
+                db.create_table()
+                db.insert_metadata(self.meta)
+
+            db.copy_points()
+
+            if i == (len(self.paths)-1):
+                close_time_1 = time.time()
+                db.create_btree_index()
+                db.disconnect()
+                close_time_count = time.time() - close_time_1
+
+            else:
+                db.disconnect()
+
+            load_time_count += time.time() - load_time_1
+
+        print("-> Load time:", round(load_time_count-(close_time_count), 2))
+        print("-> Close time:", round(close_time_count, 2))
+
 
     def get_file_paths(self, dir_path):
         return [os.path.join(dir_path, file) for file in os.listdir(dir_path) if

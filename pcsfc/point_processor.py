@@ -1,4 +1,3 @@
-import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -18,7 +17,7 @@ def compute_split_length(x, y, ratio):
         head_len = head_len - 1
 
     tail_len = length - head_len
-    print(f"Key length | full: {length}, head: {head_len}, tail: {tail_len}")
+    #print(f"Key length | full: {length}, head: {head_len}, tail: {tail_len}")
     return head_len, tail_len
 
 
@@ -29,25 +28,15 @@ class PointProcessor:
         self.scales = scales
         self.offsets = offsets
 
-    def execute(self, filename="./cache/pc_record.csv"):
-        #start_time = time.time()
-        max_count = 500000000
-        with laspy.open(self.path) as f:
-            point_count = f.header.point_count
-
-        if point_count < max_count:
-            las = laspy.read(self.path)
-            points = np.vstack((las.x, las.y, las.z)).transpose()
-            encoded_pts = self.encode_split_points(points)
-
-        #encode_time = time.time()
-        #print("Encoding time:", round(encode_time - start_time, 2))
+    def execute(self, filename="pc_record.csv"):
+        las = laspy.read(self.path)
+        points = np.vstack((las.x, las.y, las.z)).transpose()
+        encoded_pts = self.encode_split_points(points)
 
         # Sort and group the points
         pt_blocks = self.make_groups(encoded_pts)
         self.write_csv(pt_blocks, filename)
 
-        #print("Groupby time:", round(time.time() - encode_time, 2))
 
     def encode_split_points(self, points):
         encoded_points = []
@@ -76,11 +65,17 @@ class PointProcessor:
 
         # Pack the groups
         pt_blocks = []
+        histogram = []
         for key, group in groups:
             sorted_group = sorted(list(group), key=lambda x: x[1])  # Sort by SFC tail
-            sfc_tail = [sorted_group[i][1] for i in range(len(sorted_group))]
-            z = [sorted_group[i][2] for i in range(len(sorted_group))]
+            n = len(sorted_group)
+            sfc_tail = [sorted_group[i][1] for i in range(n)]
+            z = [sorted_group[i][2] for i in range(n)]
+            histogram.append((key, n))
             pt_blocks.append((key, sfc_tail, z))
+
+        df_hist = pd.DataFrame(histogram, columns=['head', 'num_tail'])
+        df_hist.to_csv("histogram.csv")
 
         return pt_blocks
 
@@ -89,15 +84,4 @@ class PointProcessor:
         df['sfc_tail'] = df['sfc_tail'].apply(lambda x: str(x).replace('[', '{').replace(']', '}'))
         df['z'] = df['z'].apply(lambda x: str(x).replace('[', '{').replace(']', '}'))
         df.to_csv(filename, index=False, mode='w')
-
-        '''
-        # Plot histogram on the number of points per block and save it as an image file
-        plt.hist(df['sfc_tail'].apply(len), bins='auto', align='left')
-        plt.xlabel('The number of Points in the Block')
-        plt.ylabel('Frequency')
-        plt.title('Histogram of Number of Points in the Block')
-
-        plt.savefig('histogram.png')
-        plt.close()
-        '''
 

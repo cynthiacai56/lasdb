@@ -23,7 +23,7 @@ def main():
         sys.exit()
 
     db_conf = jparams["config"]
-    db_conf["password"] = args.password
+    #db_conf["password"] = args.password
 
     for key, value in jparams["imports"].items():
         print(f"=== Import {key} into PostgreSQL===") # key is name
@@ -33,19 +33,17 @@ def main():
             if value["mode"] == "file":
                 pipeline = FileLoader(key, value)
                 pipeline.preparation()
-                print("Initial time:", time.time() - start_time)
+                print("-> Initial time:", time.time() - start_time)
                 pipeline.loading(db_conf)
 
             elif value["mode"] == "dir":
                 pipeline = DirLoader(key, value)
-                pipeline.preparation()
-                print("Initial time:", time.time() - start_time)
-                pipeline.loading(db_conf)
+                pipeline.run(db_conf)
 
         except Exception as e:
             print(f"An error occurred: {e}")
 
-        print("Total time: ", round(time.time() - start_time, 2))
+        print("-> Total time: ", round(time.time() - start_time, 2))
 
 
 if __name__ == '__main__':
