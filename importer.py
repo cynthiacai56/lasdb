@@ -23,7 +23,7 @@ def main():
         sys.exit()
 
     db_conf = jparams["config"]
-    #db_conf["password"] = args.password
+    db_conf["password"] = args.password
 
     for key, value in jparams["imports"].items():
         print(f"=== Import {key} into PostgreSQL===") # key is name

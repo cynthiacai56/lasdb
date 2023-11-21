@@ -107,6 +107,9 @@ class DirLoader:
 
         load_time_count = 0
         for i in range(len(self.paths)):
+            if i % 50 == 0:
+                print(i, " is being processed.")
+
             # Preparation: Encode, split and group the Morton keys
             processor = PointProcessor(self.paths[i], self.tail_len, self.scales, self.offsets)
             processor.execute()
