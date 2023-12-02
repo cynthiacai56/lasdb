@@ -10,7 +10,7 @@
     "20m_s2_50": {
       "mode": "file",
       "srid": 28992,
-      "path": "E:\\Geomatics\\GEO2020 Thesis\\data\\ahn_bench000020.las",
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
       "scales": [0.01, 0.01, 0.01],
       "offsets": [0, 0, 0],
       "ratio": 0.5
@@ -18,7 +18,7 @@
     "20m_s2_55": {
       "mode": "file",
       "srid": 28992,
-      "path": "E:\\Geomatics\\GEO2020 Thesis\\data\\ahn_bench000020.las",
+      "path": "/work/tmp/cynthia/bench_000020m/ahn_bench000020.las",
       "scales": [0.01, 0.01, 0.01],
       "offsets": [0, 0, 0],
       "ratio": 0.55
