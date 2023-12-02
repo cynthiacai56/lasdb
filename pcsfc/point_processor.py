@@ -74,8 +74,9 @@ class PointProcessor:
             histogram.append((key, n))
             pt_blocks.append((key, sfc_tail, z))
 
+        num_block = len(pt_blocks)
         df_hist = pd.DataFrame(histogram, columns=['head', 'num_tail'])
-        df_hist.to_csv("histogram.csv")
+        df_hist.to_csv(f"histogram_{num_block}.csv", index=False)
 
         return pt_blocks
 
